@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal Text Extractor & Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- External Libraries for File Processing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <style>
+        .drag-over {
+            border-color: #3b82f6 !important;
+            background-color: #eff6ff !important;
+        }
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans text-gray-800 p-4 md:p-8">
+
+    <div id="main-view" class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+        <!-- Header -->
+        <div class="bg-blue-600 p-6 text-white">
+            <h1 class="text-2xl font-bold">Universal Text Extractor</h1>
+            <p class="text-blue-100 text-sm mt-1">Extract text from PDF, Images, Word (.docx), TXT, or simply paste below.</p>
+        </div>
+
+        <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Input Section -->
+            <div class="flex flex-col gap-4">
+                <h2 class="text-lg font-semibold text-gray-700">Upload File</h2>
+                
+                <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center transition-colors cursor-pointer hover:bg-gray-50">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p class="mt-2 text-sm text-gray-600">Drag and drop a file here, or click to select</p>
+                    <p class="text-xs text-gray-500 mt-1">Supported: .pdf, .docx, .txt, .png, .jpg</p>
+                    <input type="file" id="file-input" class="hidden" accept=".pdf,.docx,.doc,.txt,image/*">
+                </div>
+
+                <div id="status-container" class="hidden bg-blue-50 text-blue-700 p-3 rounded-lg flex items-center gap-3 text-sm font-medium">
+                    <div class="loader"></div>
+                    <span id="status-text">Processing...</span>
+                </div>
+            </div>
+
+            <!-- Output Section -->
+            <div class="flex flex-col gap-4">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-lg font-semibold text-gray-700">Extracted / Pasted Text</h2>
+                    <div class="flex gap-2 flex-wrap justify-end">
+                        <button id="start-game-btn" class="text-sm bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded transition-colors shadow-sm">
+                            Start Game
+                        </button>
+                        <button id="download-btn" class="text-sm bg-green-100 hover:bg-green-200 text-green-800 py-1 px-3 rounded transition-colors shadow-sm">
+                            Download .txt
+                        </button>
+                        <button id="copy-btn" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 py-1 px-3 rounded transition-colors">
+                            Copy Text
+                        </button>
+                    </div>
+                </div>
+                
+                <textarea id="text-output" class="w-full h-64 md:h-full min-h-[300px] p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm" placeholder="Extracted text will appear here. You can also paste text directly into this box..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game View (Hidden by default) -->
+    <div id="game-view" class="hidden fixed inset-0 bg-white z-50 flex flex-col">
+        <div class="bg-blue-600 p-4 text-white flex flex-wrap gap-2 justify-between items-center shadow-md">
+            <h1 class="text-xl font-bold">Memorization Game</h1>
+            <div class="flex gap-2">
+                <button id="toggle-mode-btn" class="text-sm bg-purple-500 hover:bg-purple-600 py-1 px-3 rounded font-semibold shadow-sm transition">
+                    Mode: Linear
+                </button>
+                <button id="new-round-btn" class="text-sm bg-blue-500 hover:bg-blue-400 py-1 px-3 rounded" title="Shortcut: Esc">New Round</button>
+                <button id="exit-game-btn" class="text-sm bg-blue-800 hover:bg-blue-900 py-1 px-3 rounded">Exit</button>
+            </div>
+        </div>
+        
+        <!-- Game Area -->
+        <div id="game-area" class="flex-1 overflow-y-auto p-4 md:p-8 text-sm md:text-base leading-relaxed cursor-pointer select-none">
+            <div id="game-text" class="max-w-4xl mx-auto"></div>
+        </div>
+
+        <!-- Controls -->
+        <div id="game-controls" class="bg-gray-100 p-4 border-t border-gray-200 flex justify-center gap-4 md:gap-6 pb-8">
+            <button id="yes-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-8 md:py-3 md:px-12 rounded-full shadow-lg transform transition active:scale-95 text-base md:text-xl">
+                Yes
+            </button>
+            <button id="no-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-8 md:py-3 md:px-12 rounded-full shadow-lg transform transition active:scale-95 text-base md:text-xl">
+                No
+            </button>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const textOutput = document.getElementById('text-output');
+        const statusContainer = document.getElementById('status-container');
+        const statusText = document.getElementById('status-text');
+        const copyBtn = document.getElementById('copy-btn');
+        const downloadBtn = document.getElementById('download-btn');
+
+        const mainView = document.getElementById('main-view');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const gameView = document.getElementById('game-view');
+        const exitGameBtn = document.getElementById('exit-game-btn');
+        const newRoundBtn = document.getElementById('new-round-btn');
+        const toggleModeBtn = document.getElementById('toggle-mode-btn');
+        const gameArea = document.getElementById('game-area');
+        const gameText = document.getElementById('game-text');
+        const yesBtn = document.getElementById('yes-btn');
+        const noBtn = document.getElementById('no-btn');
+
+        let gameWords = []; 
+        let activeSequence = [];
+        let currentSeqIndex = -1;
+        let currentWordIndex = -1;
+        let gameMode = 'linear'; // 'linear' or 'category'
+
+        // --- File Logic ---
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault(); dropZone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length > 0) processFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) processFile(e.target.files[0]);
+        });
+        copyBtn.addEventListener('click', () => {
+            textOutput.select(); document.execCommand('copy');
+            const originalText = copyBtn.innerText; copyBtn.innerText = 'Copied!';
+            setTimeout(() => copyBtn.innerText = originalText, 2000);
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            const text = textOutput.value.trim();
+            if (!text) { alert("Nothing to download!"); return; }
+            const blob = new Blob([text], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "extracted_text.txt";
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // --- Game Logic ---
+        startGameBtn.addEventListener('click', () => {
+            const text = textOutput.value.trim();
+            if (!text) { alert("Please extract or paste some text first."); return; }
+            
+            gameWords = [];
+            const lines = text.split('\n');
+            lines.forEach((line, idx) => {
+                if (line.trim().length === 0) {
+                    gameWords.push({ text: '', state: 'newline', level: 0, index: idx });
+                } else {
+                    // Check if line is a bullet/subtitle (starts with spaces and bullet or just bullet)
+                    const isChild = /^\s*[-*â€¢+]\s/.test(line);
+                    gameWords.push({ 
+                        text: line, 
+                        state: 'hidden', 
+                        level: isChild ? 2 : 1,
+                        index: idx 
+                    });
+                }
+            });
+
+            mainView.classList.add('hidden');
+            gameView.classList.remove('hidden');
+            startNewRound();
+        });
+
+        exitGameBtn.addEventListener('click', () => {
+            gameView.classList.add('hidden');
+            mainView.classList.remove('hidden');
+        });
+
+        toggleModeBtn.addEventListener('click', () => {
+            gameMode = gameMode === 'linear' ? 'category' : 'linear';
+            toggleModeBtn.innerText = `Mode: ${gameMode === 'linear' ? 'Linear' : 'Category'}`;
+            startNewRound();
+        });
+
+        function generateSequence() {
+            let seq = [];
+            if (gameMode === 'linear') {
+                gameWords.forEach((w, i) => {
+                    if (w.state === 'hidden') seq.push(i);
+                });
+            } else {
+                // Category Mode: Titles (level 1) first, then Contents (level 2)
+                let titles = [];
+                let contents = [];
+                gameWords.forEach((w, i) => {
+                    if (w.state === 'hidden') {
+                        if (w.level === 1) titles.push(i);
+                        else if (w.level === 2) contents.push(i);
+                    }
+                });
+                seq = titles.concat(contents);
+            }
+            return seq;
+        }
+
+        function startNewRound() {
+            let remaining = 0;
+            gameWords.forEach(w => {
+                if (w.state === 'no' || w.state === 'hidden' || w.state === 'revealed') {
+                    if (w.state !== 'newline') {
+                        w.state = 'hidden';
+                        remaining++;
+                    }
+                }
+            });
+
+            if (remaining === 0) {
+                gameText.innerHTML = `<div class="text-center text-green-600 font-bold text-xl mt-10">All lines memorized! ðŸŽ‰</div>`;
+                currentSeqIndex = -1;
+                currentWordIndex = -1;
+                return;
+            }
+
+            activeSequence = generateSequence();
+            currentSeqIndex = -1;
+            currentWordIndex = -1;
+            renderGame();
+        }
+
+        function renderGame() {
+            gameText.innerHTML = gameWords.map((w, i) => {
+                if (w.state === 'newline') return `<div class="h-4"></div>`;
+                
+                // Add left padding for level 2 items to visually show hierarchy
+                const indentClass = w.level === 2 ? "ml-6 md:ml-10" : "";
+                const baseClasses = `mb-2 transition-all duration-300 rounded p-1 md:p-2 ${indentClass}`;
+                
+                // Handle pre-shown text enclosed in # #
+                let displayText = w.text;
+                if (w.state === 'hidden') {
+                    // Make the enclosed text visible (gray) while the rest remains transparent
+                    displayText = displayText.replace(/#([^#]+)#/g, '<span class="text-gray-700 font-semibold">$1</span>');
+                } else {
+                    // Keep it bold but let it inherit the parent's color (blue/gray)
+                    displayText = displayText.replace(/#([^#]+)#/g, '<span class="font-semibold">$1</span>');
+                }
+                
+                if (w.state === 'yes') return `<div class="${baseClasses} text-gray-800">${displayText}</div>`;
+                if (w.state === 'no') return `<div class="${baseClasses} text-gray-500">${displayText}</div>`;
+                if (w.state === 'revealed') return `<div id="current-revealed-word" class="${baseClasses} text-blue-700 font-bold bg-blue-100 scale-[1.01] shadow-sm origin-left">${displayText}</div>`;
+                
+                // hidden state (blank gap)
+                return `<div class="${baseClasses} text-transparent select-none bg-gray-50">${displayText}</div>`;
+            }).join('');
+
+            const revealedEl = document.getElementById('current-revealed-word');
+            if(revealedEl) {
+                revealedEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        function advanceGame() {
+            currentSeqIndex++;
+            if (currentSeqIndex < activeSequence.length) {
+                currentWordIndex = activeSequence[currentSeqIndex];
+                gameWords[currentWordIndex].state = 'revealed';
+                renderGame();
+            } else {
+                startNewRound();
+            }
+        }
+
+        newRoundBtn.addEventListener('click', startNewRound);
+
+        document.addEventListener('keydown', (e) => {
+            if (gameView.classList.contains('hidden')) return;
+
+            if (e.key === 'Escape' || e.key === 'ArrowLeft') {
+                startNewRound();
+                return;
+            }
+            
+            if (currentWordIndex === -1 || gameWords[currentWordIndex].state !== 'revealed') {
+                e.preventDefault(); advanceGame(); return;
+            }
+
+            if (e.key === ' ' || e.key === 'ArrowRight') {
+                e.preventDefault(); noBtn.click();
+            } else if (e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                e.preventDefault(); yesBtn.click();
+            }
+        });
+
+        gameArea.addEventListener('click', (e) => {
+            if (currentWordIndex === -1 || gameWords[currentWordIndex].state !== 'revealed') {
+                advanceGame(); return;
+            }
+            if (currentWordIndex !== -1 && gameWords[currentWordIndex].state === 'revealed') {
+                gameWords[currentWordIndex].state = 'no';
+            }
+            advanceGame();
+        });
+
+        yesBtn.addEventListener('click', () => {
+            if (currentWordIndex !== -1 && gameWords[currentWordIndex].state === 'revealed') {
+                gameWords[currentWordIndex].state = 'yes';
+                renderGame();
+            } else {
+                advanceGame();
+            }
+        });
+
+        noBtn.addEventListener('click', () => {
+            if (currentWordIndex !== -1 && gameWords[currentWordIndex].state === 'revealed') {
+                gameWords[currentWordIndex].state = 'no';
+                advanceGame();
+            } else {
+                advanceGame();
+            }
+        });
+
+        // --- File Extraction Logic ---
+        async function processFile(file) {
+            const ext = file.name.split('.').pop().toLowerCase();
+            textOutput.value = ''; 
+            showStatus(`Reading ${file.name}...`);
+            try {
+                if (ext === 'txt') await extractFromTxt(file);
+                else if (ext === 'pdf') await extractFromPdf(file);
+                else if (ext === 'docx') await extractFromDocx(file);
+                else if (ext === 'doc') throw new Error("Legacy .doc files are not supported in-browser. Please convert to .docx or PDF.");
+                else if (['png', 'jpg', 'jpeg', 'bmp', 'webp'].includes(ext)) await extractFromImage(file);
+                else throw new Error(`Unsupported file type: .${ext}`);
+            } catch (error) {
+                console.error(error); textOutput.value = `Error:\n${error.message}`;
+            } finally {
+                hideStatus(); fileInput.value = '';
+            }
+        }
+        function showStatus(msg) { statusText.innerText = msg; statusContainer.classList.remove('hidden'); }
+        function hideStatus() { statusContainer.classList.add('hidden'); }
+        function appendText(txt) { if (textOutput.value.length > 0) textOutput.value += '\n\n'; textOutput.value += txt.trim(); }
+        function extractFromTxt(file) {
+            return new Promise((res, rej) => { const reader = new FileReader(); reader.onload = (e) => { appendText(e.target.result); res(); }; reader.onerror = rej; reader.readAsText(file); });
+        }
+        async function extractFromPdf(file) {
+            const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
+            let fullText = '';
+            for (let i = 1; i <= pdf.numPages; i++) {
+                showStatus(`Extracting PDF (Page ${i}/${pdf.numPages})...`);
+                const content = await (await pdf.getPage(i)).getTextContent();
+                fullText += content.items.map(item => item.str).join(' ') + '\n';
+            }
+            appendText(fullText);
+        }
+        async function extractFromDocx(file) {
+            showStatus("Extracting Word Document...");
+            const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+            appendText(result.value);
+        }
+        async function extractFromImage(file) {
+            showStatus("Running OCR on image...");
+            const worker = await Tesseract.createWorker({ logger: m => { if (m.status === 'recognizing text') showStatus(`Recognizing Text: ${Math.round(m.progress * 100)}%`); } });
+            await worker.loadLanguage('eng+ben'); // Added Bengali language support just in case
+            await worker.initialize('eng+ben');
+            const { data: { text } } = await worker.recognize(file);
+            appendText(text);
+            await worker.terminate();
+        }
+    </script>
+</body>
+</html>
