@@ -1,394 +1,884 @@
 <!DOCTYPE html>
 <html lang="bn">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Universal Text Extractor & Game</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Universal Text Extractor & Memory Trainer</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- External Libraries for File Processing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-
     <style>
-        .drag-over {
-            border-color: #3b82f6 !important;
-            background-color: #eff6ff !important;
-        }
+        .drag-over { border-color: #2563eb !important; background-color: #eff6ff !important; }
         .loader {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #3b82f6;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
+            border: 3px solid #e5e7eb;
+            border-top: 3px solid #2563eb;
+            border-radius: 9999px;
+            width: 22px;
+            height: 22px;
             animation: spin 1s linear infinite;
             display: inline-block;
-            vertical-align: middle;
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .glass { backdrop-filter: blur(12px); }
+        .hidden-answer { color: transparent; background: linear-gradient(90deg, rgba(209,213,219,.28), rgba(229,231,235,.65), rgba(209,213,219,.28)); border-radius: 10px; }
+        .hidden-answer .always-visible { color: #374151 !important; }
+        .dark .hidden-answer .always-visible { color: #e5e7eb !important; }
+        .toast-show { animation: toast-in .25s ease-out forwards; }
+        .pulse-soft { animation: pulse-soft 1.3s ease-in-out infinite; }
+        @keyframes spin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
+        @keyframes toast-in { from { opacity: 0; transform: translateY(12px);} to { opacity: 1; transform: translateY(0);} }
+        @keyframes pulse-soft { 0%,100% { transform: scale(1);} 50% { transform: scale(1.02);} }
+        body.dark { background: #0f172a; color: #e5e7eb; }
+        body.dark textarea, body.dark .panel, body.dark .card, body.dark .game-shell { background: #111827 !important; color: #e5e7eb !important; border-color: #334155 !important; }
+        body.dark .muted { color: #94a3b8 !important; }
+        body.dark .surface { background: #1e293b !important; }
+        body.dark #game-view { background: #020617; }
+        body.dark .topbar { background: linear-gradient(90deg,#1d4ed8,#4338ca); }
+        body.dark .hidden-answer { background: linear-gradient(90deg, rgba(51,65,85,.45), rgba(71,85,105,.65), rgba(51,65,85,.45)); }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen font-sans text-gray-800 p-4 md:p-8">
+<body class="bg-slate-50 min-h-screen font-sans text-slate-800 p-4 md:p-8 transition-colors">
+    <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 text-white px-4 py-2 rounded-full shadow-xl text-sm toast-show"></div>
 
-    <div id="main-view" class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
-        <!-- Header -->
-        <div class="bg-blue-600 p-6 text-white">
-            <h1 class="text-2xl font-bold">Universal Text Extractor</h1>
-            <p class="text-blue-100 text-sm mt-1">Extract text from PDF, Images, Word (.docx), TXT, or simply paste below.</p>
+    <div id="main-view" class="max-w-6xl mx-auto card bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 md:p-8 text-white">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-bold">Universal Text Extractor & Memory Trainer</h1>
+                    <p class="text-blue-100 mt-2 text-sm md:text-base">PDF, image, DOCX, TXT, or pasted text → clean it → turn it into a smarter memorization game.</p>
+                </div>
+                <button id="theme-toggle-btn" class="self-start md:self-auto bg-white/15 hover:bg-white/25 border border-white/20 px-4 py-2 rounded-xl text-sm font-semibold transition">🌙 Dark mode</button>
+            </div>
         </div>
 
-        <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Input Section -->
-            <div class="flex flex-col gap-4">
-                <h2 class="text-lg font-semibold text-gray-700">Upload File</h2>
-                
-                <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center transition-colors cursor-pointer hover:bg-gray-50">
-                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    <p class="mt-2 text-sm text-gray-600">Drag and drop a file here, or click to select</p>
-                    <p class="text-xs text-gray-500 mt-1">Supported: .pdf, .docx, .txt, .png, .jpg</p>
-                    <input type="file" id="file-input" class="hidden" accept=".pdf,.docx,.doc,.txt,image/*">
+        <div class="p-5 md:p-6 grid grid-cols-1 xl:grid-cols-[1.05fr_1.35fr] gap-6">
+            <div class="space-y-5">
+                <div class="panel bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                    <div class="flex items-center justify-between gap-3 mb-3">
+                        <h2 class="text-lg font-semibold">Input</h2>
+                        <span id="file-badge" class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full muted">No file loaded</span>
+                    </div>
+
+                    <div id="drop-zone" class="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center transition cursor-pointer hover:bg-slate-50">
+                        <div class="text-5xl mb-3">📄</div>
+                        <p class="font-semibold">Drag & drop a file here</p>
+                        <p class="text-sm muted mt-1">or tap to select</p>
+                        <p class="text-xs muted mt-2">Supported: PDF, DOCX, TXT, PNG, JPG, JPEG, WEBP, BMP</p>
+                        <input type="file" id="file-input" class="hidden" accept=".pdf,.docx,.doc,.txt,image/*" multiple>
+                    </div>
+
+                    <div id="status-container" class="hidden mt-4 bg-blue-50 text-blue-700 border border-blue-100 p-3 rounded-2xl flex items-center gap-3 text-sm font-medium">
+                        <div class="loader"></div>
+                        <span id="status-text">Processing...</span>
+                    </div>
                 </div>
 
-                <div id="status-container" class="hidden bg-blue-50 text-blue-700 p-3 rounded-lg flex items-center gap-3 text-sm font-medium">
-                    <div class="loader"></div>
-                    <span id="status-text">Processing...</span>
+                <div class="panel bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                    <div class="flex items-center justify-between gap-4 flex-wrap">
+                        <h2 class="text-lg font-semibold">Game Setup</h2>
+                        <button id="restore-btn" class="text-sm bg-amber-100 hover:bg-amber-200 text-amber-800 px-3 py-2 rounded-xl transition">Restore Saved Game</button>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <label class="space-y-2">
+                            <span class="text-sm font-medium">Chunk mode</span>
+                            <select id="chunk-mode-select" class="w-full rounded-xl border border-slate-300 px-3 py-2 bg-white surface">
+                                <option value="line">Line</option>
+                                <option value="sentence">Sentence</option>
+                            </select>
+                        </label>
+                        <label class="space-y-2">
+                            <span class="text-sm font-medium">Sequence mode</span>
+                            <select id="sequence-mode-select" class="w-full rounded-xl border border-slate-300 px-3 py-2 bg-white surface">
+                                <option value="linear">Linear</option>
+                                <option value="category">Category</option>
+                                <option value="shuffle">Shuffle</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                        <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 cursor-pointer surface">
+                            <input id="remember-hints-checkbox" type="checkbox" checked>
+                            <span>Show #hint#</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 cursor-pointer surface">
+                            <input id="save-progress-checkbox" type="checkbox" checked>
+                            <span>Auto save</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 cursor-pointer surface">
+                            <input id="repeat-mistakes-checkbox" type="checkbox" checked>
+                            <span>Repeat mistakes</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 cursor-pointer surface">
+                            <input id="clean-before-start-checkbox" type="checkbox" checked>
+                            <span>Auto clean</span>
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <button id="clean-text-btn" class="bg-slate-100 hover:bg-slate-200 px-4 py-3 rounded-xl font-semibold transition">Clean Text</button>
+                        <button id="copy-btn" class="bg-slate-100 hover:bg-slate-200 px-4 py-3 rounded-xl font-semibold transition">Copy</button>
+                        <button id="download-btn" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-4 py-3 rounded-xl font-semibold transition">Download TXT</button>
+                        <button id="start-game-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl font-semibold shadow-lg transition">Start Game</button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Output Section -->
-            <div class="flex flex-col gap-4">
-                <div class="flex justify-between items-center">
-                    <h2 class="text-lg font-semibold text-gray-700">Extracted / Pasted Text</h2>
-                    <div class="flex gap-2 flex-wrap justify-end">
-                        <button id="start-game-btn" class="text-sm bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded transition-colors shadow-sm">
-                            Start Game
-                        </button>
-                        <button id="download-btn" class="text-sm bg-green-100 hover:bg-green-200 text-green-800 py-1 px-3 rounded transition-colors shadow-sm">
-                            Download .txt
-                        </button>
-                        <button id="copy-btn" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 py-1 px-3 rounded transition-colors">
-                            Copy Text
-                        </button>
+            <div class="panel bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col gap-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-semibold">Text Workspace</h2>
+                        <p class="text-sm muted">Paste text directly or extract from files, then clean and practice.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2 text-xs">
+                        <span id="stat-lines" class="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full">Lines: 0</span>
+                        <span id="stat-words" class="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full">Words: 0</span>
+                        <span id="stat-chars" class="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full">Chars: 0</span>
+                        <span id="stat-reading" class="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full">Read: 0 min</span>
                     </div>
                 </div>
-                
-                <textarea id="text-output" class="w-full h-64 md:h-full min-h-[300px] p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm" placeholder="Extracted text will appear here. You can also paste text directly into this box..."></textarea>
+                <textarea id="text-output" class="w-full min-h-[420px] md:min-h-[520px] p-4 border border-slate-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y text-sm leading-6 panel" placeholder="Extracted text will appear here. You can also paste text directly..."></textarea>
             </div>
         </div>
     </div>
 
-    <!-- Game View (Hidden by default) -->
-    <div id="game-view" class="hidden fixed inset-0 bg-white z-50 flex flex-col">
-        <div class="bg-blue-600 p-4 text-white flex flex-wrap gap-2 justify-between items-center shadow-md">
-            <h1 class="text-xl font-bold">Memorization Game</h1>
-            <div class="flex gap-2">
-                <button id="toggle-mode-btn" class="text-sm bg-purple-500 hover:bg-purple-600 py-1 px-3 rounded font-semibold shadow-sm transition">
-                    Mode: Linear
-                </button>
-                <button id="new-round-btn" class="text-sm bg-blue-500 hover:bg-blue-400 py-1 px-3 rounded" title="Shortcut: Esc">New Round</button>
-                <button id="exit-game-btn" class="text-sm bg-blue-800 hover:bg-blue-900 py-1 px-3 rounded">Exit</button>
+    <div id="game-view" class="hidden fixed inset-0 z-50 flex flex-col">
+        <div class="topbar bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg">
+            <div class="max-w-6xl mx-auto px-4 md:px-6 py-4 space-y-3">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                    <div>
+                        <h1 class="text-xl md:text-2xl font-bold">Memorization Game</h1>
+                        <p id="game-subtitle" class="text-blue-100 text-sm">Tap anywhere in the content area to move ahead when nothing is revealed.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button id="new-round-btn" class="bg-white/15 hover:bg-white/25 px-4 py-2 rounded-xl text-sm font-semibold transition">New Round</button>
+                        <button id="review-mistakes-btn" class="bg-amber-400/90 hover:bg-amber-400 text-amber-950 px-4 py-2 rounded-xl text-sm font-semibold transition">Review Mistakes</button>
+                        <button id="exit-game-btn" class="bg-slate-900/35 hover:bg-slate-900/55 px-4 py-2 rounded-xl text-sm font-semibold transition">Exit</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                    <div class="bg-white/12 rounded-2xl px-4 py-3 glass">
+                        <div class="text-blue-100 text-xs uppercase tracking-wide">Progress</div>
+                        <div id="progress-label" class="font-bold text-lg">0 / 0</div>
+                    </div>
+                    <div class="bg-white/12 rounded-2xl px-4 py-3 glass">
+                        <div class="text-blue-100 text-xs uppercase tracking-wide">Accuracy</div>
+                        <div id="accuracy-label" class="font-bold text-lg">0%</div>
+                    </div>
+                    <div class="bg-white/12 rounded-2xl px-4 py-3 glass">
+                        <div class="text-blue-100 text-xs uppercase tracking-wide">Remaining</div>
+                        <div id="remaining-label" class="font-bold text-lg">0</div>
+                    </div>
+                    <div class="bg-white/12 rounded-2xl px-4 py-3 glass">
+                        <div class="text-blue-100 text-xs uppercase tracking-wide">Mistakes</div>
+                        <div id="mistake-label" class="font-bold text-lg">0</div>
+                    </div>
+                    <div class="bg-white/12 rounded-2xl px-4 py-3 glass">
+                        <div class="text-blue-100 text-xs uppercase tracking-wide">Mode</div>
+                        <div id="mode-label" class="font-bold text-lg">Linear / Line</div>
+                    </div>
+                </div>
+
+                <div class="w-full h-2.5 bg-white/20 rounded-full overflow-hidden">
+                    <div id="progress-bar" class="h-full bg-emerald-300 rounded-full transition-all duration-300" style="width:0%"></div>
+                </div>
             </div>
         </div>
-        
-        <!-- Game Area -->
-        <div id="game-area" class="flex-1 overflow-y-auto p-4 md:p-8 text-sm md:text-base leading-relaxed cursor-pointer select-none">
-            <div id="game-text" class="max-w-4xl mx-auto"></div>
+
+        <div id="game-area" class="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 bg-slate-50 dark:bg-slate-950">
+            <div class="game-shell max-w-5xl mx-auto bg-white border border-slate-200 rounded-3xl shadow-xl p-4 md:p-6">
+                <div id="game-text" class="text-sm md:text-base leading-8 select-none"></div>
+            </div>
         </div>
 
-        <!-- Controls -->
-        <div id="game-controls" class="bg-gray-100 p-4 border-t border-gray-200 flex justify-center gap-4 md:gap-6 pb-8">
-            <button id="yes-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-8 md:py-3 md:px-12 rounded-full shadow-lg transform transition active:scale-95 text-base md:text-xl">
-                Yes
-            </button>
-            <button id="no-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-8 md:py-3 md:px-12 rounded-full shadow-lg transform transition active:scale-95 text-base md:text-xl">
-                No
-            </button>
+        <div class="bg-white/90 border-t border-slate-200 p-4 md:p-5 sticky bottom-0">
+            <div class="max-w-5xl mx-auto flex flex-wrap justify-center gap-3 md:gap-4">
+                <button id="show-all-btn" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold px-4 py-3 rounded-2xl transition">Show All</button>
+                <button id="hide-all-btn" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold px-4 py-3 rounded-2xl transition">Hide All</button>
+                <button id="reveal-btn" class="bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-3 rounded-2xl shadow-lg transition">Reveal</button>
+                <button id="yes-btn" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-6 py-3 rounded-2xl shadow-lg transition">Yes</button>
+                <button id="no-btn" class="bg-rose-500 hover:bg-rose-600 text-white font-bold px-6 py-3 rounded-2xl shadow-lg transition">No</button>
+            </div>
+            <p class="text-center text-xs muted mt-3">Shortcuts: Enter = Yes, Space = No, R = Reveal, N = New Round, M = Review Mistakes, Esc = Exit</p>
         </div>
     </div>
 
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+        const STORAGE_KEYS = {
+            text: 'ute_text_v2',
+            prefs: 'ute_prefs_v2',
+            game: 'ute_game_state_v2',
+            theme: 'ute_theme_v2'
+        };
+
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
+        const fileBadge = document.getElementById('file-badge');
         const textOutput = document.getElementById('text-output');
         const statusContainer = document.getElementById('status-container');
         const statusText = document.getElementById('status-text');
         const copyBtn = document.getElementById('copy-btn');
         const downloadBtn = document.getElementById('download-btn');
+        const cleanTextBtn = document.getElementById('clean-text-btn');
+        const themeToggleBtn = document.getElementById('theme-toggle-btn');
+        const restoreBtn = document.getElementById('restore-btn');
+
+        const chunkModeSelect = document.getElementById('chunk-mode-select');
+        const sequenceModeSelect = document.getElementById('sequence-mode-select');
+        const rememberHintsCheckbox = document.getElementById('remember-hints-checkbox');
+        const saveProgressCheckbox = document.getElementById('save-progress-checkbox');
+        const repeatMistakesCheckbox = document.getElementById('repeat-mistakes-checkbox');
+        const cleanBeforeStartCheckbox = document.getElementById('clean-before-start-checkbox');
+
+        const statLines = document.getElementById('stat-lines');
+        const statWords = document.getElementById('stat-words');
+        const statChars = document.getElementById('stat-chars');
+        const statReading = document.getElementById('stat-reading');
 
         const mainView = document.getElementById('main-view');
         const startGameBtn = document.getElementById('start-game-btn');
         const gameView = document.getElementById('game-view');
         const exitGameBtn = document.getElementById('exit-game-btn');
         const newRoundBtn = document.getElementById('new-round-btn');
-        const toggleModeBtn = document.getElementById('toggle-mode-btn');
+        const reviewMistakesBtn = document.getElementById('review-mistakes-btn');
         const gameArea = document.getElementById('game-area');
         const gameText = document.getElementById('game-text');
         const yesBtn = document.getElementById('yes-btn');
         const noBtn = document.getElementById('no-btn');
+        const revealBtn = document.getElementById('reveal-btn');
+        const showAllBtn = document.getElementById('show-all-btn');
+        const hideAllBtn = document.getElementById('hide-all-btn');
 
-        let gameWords = []; 
+        const progressLabel = document.getElementById('progress-label');
+        const accuracyLabel = document.getElementById('accuracy-label');
+        const remainingLabel = document.getElementById('remaining-label');
+        const mistakeLabel = document.getElementById('mistake-label');
+        const modeLabel = document.getElementById('mode-label');
+        const progressBar = document.getElementById('progress-bar');
+        const gameSubtitle = document.getElementById('game-subtitle');
+        const toast = document.getElementById('toast');
+
+        let gameWords = [];
         let activeSequence = [];
         let currentSeqIndex = -1;
         let currentWordIndex = -1;
-        let gameMode = 'linear'; // 'linear' or 'category'
+        let tesseractWorker = null;
 
-        // --- File Logic ---
-        dropZone.addEventListener('click', () => fileInput.click());
-        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault(); dropZone.classList.remove('drag-over');
-            if (e.dataTransfer.files.length > 0) processFile(e.dataTransfer.files[0]);
-        });
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) processFile(e.target.files[0]);
-        });
-        copyBtn.addEventListener('click', () => {
-            textOutput.select(); document.execCommand('copy');
-            const originalText = copyBtn.innerText; copyBtn.innerText = 'Copied!';
-            setTimeout(() => copyBtn.innerText = originalText, 2000);
-        });
+        const gameStats = {
+            total: 0,
+            yes: 0,
+            no: 0,
+            reveal: 0,
+            mistakes: new Set(),
+            round: 1
+        };
 
-        downloadBtn.addEventListener('click', () => {
-            const text = textOutput.value.trim();
-            if (!text) { alert("Nothing to download!"); return; }
-            const blob = new Blob([text], { type: "text/plain" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "extracted_text.txt";
-            a.click();
-            URL.revokeObjectURL(url);
-        });
+        init();
 
-        // --- Game Logic ---
-        startGameBtn.addEventListener('click', () => {
-            const text = textOutput.value.trim();
-            if (!text) { alert("Please extract or paste some text first."); return; }
-            
-            gameWords = [];
-            const lines = text.split('\n');
-            lines.forEach((line, idx) => {
-                if (line.trim().length === 0) {
-                    gameWords.push({ text: '', state: 'newline', level: 0, index: idx });
-                } else {
-                    // Check if line is a bullet/subtitle (starts with spaces and bullet or just bullet)
-                    const isChild = /^\s*[-*â€¢+]\s/.test(line);
-                    gameWords.push({ 
-                        text: line, 
-                        state: 'hidden', 
-                        level: isChild ? 2 : 1,
-                        index: idx 
-                    });
+        function init() {
+            applySavedTheme();
+            loadPreferences();
+            loadSavedText();
+            updateTextStats();
+            attachEvents();
+        }
+
+        function attachEvents() {
+            dropZone.addEventListener('click', () => fileInput.click());
+            dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+            dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+                if (e.dataTransfer.files?.length) processFiles([...e.dataTransfer.files]);
+            });
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files?.length) processFiles([...e.target.files]);
+            });
+
+            textOutput.addEventListener('input', () => {
+                updateTextStats();
+                persistText();
+            });
+
+            [chunkModeSelect, sequenceModeSelect, rememberHintsCheckbox, saveProgressCheckbox, repeatMistakesCheckbox, cleanBeforeStartCheckbox]
+                .forEach(el => el.addEventListener('change', savePreferences));
+
+            themeToggleBtn.addEventListener('click', toggleTheme);
+            cleanTextBtn.addEventListener('click', () => {
+                textOutput.value = cleanText(textOutput.value);
+                updateTextStats();
+                persistText();
+                showToast('Text cleaned');
+            });
+
+            copyBtn.addEventListener('click', async () => {
+                const text = textOutput.value.trim();
+                if (!text) return showToast('Nothing to copy');
+                try {
+                    await navigator.clipboard.writeText(text);
+                    showToast('Copied to clipboard');
+                } catch {
+                    textOutput.select();
+                    document.execCommand('copy');
+                    showToast('Copied to clipboard');
                 }
             });
 
+            downloadBtn.addEventListener('click', () => {
+                const text = textOutput.value.trim();
+                if (!text) return showToast('Nothing to download');
+                const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'extracted_text.txt';
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('TXT downloaded');
+            });
+
+            startGameBtn.addEventListener('click', startGameFromText);
+            restoreBtn.addEventListener('click', restoreSavedGame);
+            exitGameBtn.addEventListener('click', exitGame);
+            newRoundBtn.addEventListener('click', startNewRound);
+            reviewMistakesBtn.addEventListener('click', startMistakeReview);
+            revealBtn.addEventListener('click', revealCurrent);
+            yesBtn.addEventListener('click', markYes);
+            noBtn.addEventListener('click', markNo);
+            showAllBtn.addEventListener('click', showAll);
+            hideAllBtn.addEventListener('click', hideAll);
+
+            gameArea.addEventListener('click', (e) => {
+                if (e.target.closest('button')) return;
+                if (currentWordIndex === -1 || gameWords[currentWordIndex]?.state !== 'revealed') {
+                    advanceGame();
+                }
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (gameView.classList.contains('hidden')) return;
+                if (e.key === 'Escape') return exitGame();
+                if (e.key === 'n' || e.key === 'N') return startNewRound();
+                if (e.key === 'm' || e.key === 'M') return startMistakeReview();
+                if (e.key === 'r' || e.key === 'R') return revealCurrent();
+                if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); return markNo(); }
+                if (e.key === 'Enter') { e.preventDefault(); return markYes(); }
+                if (e.key === 'ArrowRight') return advanceGame();
+            });
+        }
+
+        function cleanText(text) {
+            return text
+                .replace(/\r/g, '')
+                .replace(/\u00A0/g, ' ')
+                .replace(/[ \t]{2,}/g, ' ')
+                .replace(/\n[ \t]+/g, '\n')
+                .replace(/^[ \t]+/gm, '')
+                .replace(/^(page|পৃষ্ঠা)\s*\d+\s*$/gim, '')
+                .replace(/\n{3,}/g, '\n\n')
+                .trim();
+        }
+
+        function splitIntoChunks(text, mode) {
+            const normalized = text.replace(/\r/g, '').trim();
+            if (!normalized) return [];
+            if (mode === 'sentence') {
+                return normalized
+                    .split(/(?<=[.!?।])\s+|\n+/)
+                    .map(s => s.trim())
+                    .filter(Boolean)
+                    .map((item, idx) => ({ text: item, raw: item, state: 'hidden', level: detectLevel(item), index: idx }));
+            }
+
+            return normalized
+                .split('\n')
+                .map(line => line.replace(/[ \t]+$/g, ''))
+                .map((line, idx) => line.trim().length === 0
+                    ? { text: '', raw: '', state: 'newline', level: 0, index: idx }
+                    : { text: line, raw: line, state: 'hidden', level: detectLevel(line), index: idx })
+        }
+
+        function detectLevel(line) {
+            if (/^\s*[-*•+]/.test(line)) return 2;
+            if (/^\s*\d+[.)]/.test(line)) return 1;
+            return /^\s/.test(line) ? 2 : 1;
+        }
+
+        function startGameFromText() {
+            let text = textOutput.value.trim();
+            if (!text) return showToast('Please add some text first');
+            if (cleanBeforeStartCheckbox.checked) {
+                text = cleanText(text);
+                textOutput.value = text;
+                updateTextStats();
+                persistText();
+            }
+
+            gameWords = splitIntoChunks(text, chunkModeSelect.value);
+            if (!gameWords.some(w => w.state === 'hidden')) return showToast('No usable lines found');
+
+            resetStats();
+            gameStats.total = gameWords.filter(w => w.state !== 'newline').length;
+            openGameView();
+            startNewRound();
+            showToast('Game started');
+        }
+
+        function resetStats() {
+            gameStats.total = 0;
+            gameStats.yes = 0;
+            gameStats.no = 0;
+            gameStats.reveal = 0;
+            gameStats.mistakes = new Set();
+            gameStats.round = 1;
+        }
+
+        function openGameView() {
             mainView.classList.add('hidden');
             gameView.classList.remove('hidden');
-            startNewRound();
-        });
+            updateModeLabel();
+        }
 
-        exitGameBtn.addEventListener('click', () => {
+        function exitGame() {
             gameView.classList.add('hidden');
             mainView.classList.remove('hidden');
-        });
+            persistGameState();
+        }
 
-        toggleModeBtn.addEventListener('click', () => {
-            gameMode = gameMode === 'linear' ? 'category' : 'linear';
-            toggleModeBtn.innerText = `Mode: ${gameMode === 'linear' ? 'Linear' : 'Category'}`;
-            startNewRound();
-        });
+        function updateModeLabel() {
+            const seqText = sequenceModeSelect.value[0].toUpperCase() + sequenceModeSelect.value.slice(1);
+            const chunkText = chunkModeSelect.value[0].toUpperCase() + chunkModeSelect.value.slice(1);
+            modeLabel.textContent = `${seqText} / ${chunkText}`;
+        }
 
-        function generateSequence() {
-            let seq = [];
-            if (gameMode === 'linear') {
-                gameWords.forEach((w, i) => {
-                    if (w.state === 'hidden') seq.push(i);
-                });
-            } else {
-                // Category Mode: Titles (level 1) first, then Contents (level 2)
-                let titles = [];
-                let contents = [];
-                gameWords.forEach((w, i) => {
-                    if (w.state === 'hidden') {
-                        if (w.level === 1) titles.push(i);
-                        else if (w.level === 2) contents.push(i);
-                    }
-                });
-                seq = titles.concat(contents);
+        function generateSequence(source = null) {
+            const indices = [];
+            const list = source || gameWords;
+            list.forEach((w, i) => {
+                if (w.state === 'hidden') indices.push(i);
+            });
+
+            if (sequenceModeSelect.value === 'shuffle') {
+                return shuffle(indices);
             }
-            return seq;
+            if (sequenceModeSelect.value === 'category') {
+                const titles = indices.filter(i => gameWords[i].level === 1);
+                const children = indices.filter(i => gameWords[i].level !== 1);
+                return titles.concat(children);
+            }
+            return indices;
+        }
+
+        function shuffle(arr) {
+            const cloned = [...arr];
+            for (let i = cloned.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [cloned[i], cloned[j]] = [cloned[j], cloned[i]];
+            }
+            return cloned;
         }
 
         function startNewRound() {
             let remaining = 0;
             gameWords.forEach(w => {
-                if (w.state === 'no' || w.state === 'hidden' || w.state === 'revealed') {
-                    if (w.state !== 'newline') {
-                        w.state = 'hidden';
-                        remaining++;
-                    }
+                if (w.state !== 'newline' && w.state !== 'yes') {
+                    w.state = 'hidden';
+                    remaining++;
                 }
             });
 
             if (remaining === 0) {
-                gameText.innerHTML = `<div class="text-center text-green-600 font-bold text-xl mt-10">All lines memorized! ðŸŽ‰</div>`;
-                currentSeqIndex = -1;
-                currentWordIndex = -1;
+                renderCompletion('All chunks memorized 🎉');
+                persistGameState();
                 return;
             }
 
             activeSequence = generateSequence();
             currentSeqIndex = -1;
             currentWordIndex = -1;
+            gameSubtitle.textContent = `Round ${gameStats.round} • Tap in the reading area to reveal the next item.`;
             renderGame();
+            updateStatsUI();
+            gameStats.round += 1;
+        }
+
+        function startMistakeReview() {
+            const mistakeIndices = [...gameStats.mistakes].filter(i => gameWords[i] && gameWords[i].state !== 'newline');
+            if (!mistakeIndices.length) return showToast('No mistakes to review yet');
+
+            gameWords.forEach((w, i) => {
+                if (w.state !== 'newline') {
+                    w.state = mistakeIndices.includes(i) ? 'hidden' : 'yes';
+                }
+            });
+            activeSequence = shuffle(mistakeIndices);
+            currentSeqIndex = -1;
+            currentWordIndex = -1;
+            gameSubtitle.textContent = `Mistake review • ${mistakeIndices.length} item(s)`;
+            renderGame();
+            updateStatsUI();
+            showToast('Mistake review started');
+        }
+
+        function revealCurrent() {
+            if (currentWordIndex === -1 || gameWords[currentWordIndex]?.state !== 'revealed') {
+                advanceGame();
+                return;
+            }
+            gameStats.reveal += 1;
+            renderGame();
+            updateStatsUI();
+            showToast('Answer already visible');
+        }
+
+        function advanceGame() {
+            if (!activeSequence.length) {
+                if (repeatMistakesCheckbox.checked && gameStats.mistakes.size) return startMistakeReview();
+                return startNewRound();
+            }
+
+            if (currentWordIndex !== -1 && gameWords[currentWordIndex]?.state === 'revealed') {
+                gameWords[currentWordIndex].state = 'hidden';
+            }
+
+            currentSeqIndex += 1;
+            if (currentSeqIndex >= activeSequence.length) {
+                if (repeatMistakesCheckbox.checked && getRemainingCount() === 0 && gameStats.mistakes.size) {
+                    return startMistakeReview();
+                }
+                return startNewRound();
+            }
+
+            currentWordIndex = activeSequence[currentSeqIndex];
+            if (!gameWords[currentWordIndex]) return advanceGame();
+            gameWords[currentWordIndex].state = 'revealed';
+            renderGame();
+            updateStatsUI();
+            persistGameState();
+        }
+
+        function markYes() {
+            if (currentWordIndex === -1) return advanceGame();
+            const current = gameWords[currentWordIndex];
+            if (!current || current.state !== 'revealed') return advanceGame();
+            current.state = 'yes';
+            gameStats.yes += 1;
+            renderGame();
+            updateStatsUI();
+            persistGameState();
+            advanceGame();
+        }
+
+        function markNo() {
+            if (currentWordIndex === -1) return advanceGame();
+            const current = gameWords[currentWordIndex];
+            if (!current || current.state !== 'revealed') return advanceGame();
+            current.state = 'no';
+            gameStats.no += 1;
+            gameStats.mistakes.add(currentWordIndex);
+            renderGame();
+            updateStatsUI();
+            persistGameState();
+            advanceGame();
+        }
+
+        function showAll() {
+            gameWords.forEach(w => { if (w.state !== 'newline') w.state = 'yes'; });
+            renderGame();
+            updateStatsUI();
+            persistGameState();
+            showToast('All items shown');
+        }
+
+        function hideAll() {
+            gameWords.forEach(w => { if (w.state !== 'newline') w.state = 'hidden'; });
+            currentWordIndex = -1;
+            currentSeqIndex = -1;
+            activeSequence = generateSequence();
+            renderGame();
+            updateStatsUI();
+            persistGameState();
+            showToast('All items hidden');
         }
 
         function renderGame() {
             gameText.innerHTML = gameWords.map((w, i) => {
-                if (w.state === 'newline') return `<div class="h-4"></div>`;
-                
-                // Add left padding for level 2 items to visually show hierarchy
-                const indentClass = w.level === 2 ? "ml-6 md:ml-10" : "";
-                const baseClasses = `mb-2 transition-all duration-300 rounded p-1 md:p-2 ${indentClass}`;
-                
-                // Handle pre-shown text enclosed in # #
-                let displayText = w.text;
-                if (w.state === 'hidden') {
-                    // Make the enclosed text visible (gray) while the rest remains transparent
-                    displayText = displayText.replace(/#([^#]+)#/g, '<span class="text-gray-700 font-semibold">$1</span>');
-                } else {
-                    // Keep it bold but let it inherit the parent's color (blue/gray)
-                    displayText = displayText.replace(/#([^#]+)#/g, '<span class="font-semibold">$1</span>');
-                }
-                
-                if (w.state === 'yes') return `<div class="${baseClasses} text-gray-800">${displayText}</div>`;
-                if (w.state === 'no') return `<div class="${baseClasses} text-gray-500">${displayText}</div>`;
-                if (w.state === 'revealed') return `<div id="current-revealed-word" class="${baseClasses} text-blue-700 font-bold bg-blue-100 scale-[1.01] shadow-sm origin-left">${displayText}</div>`;
-                
-                // hidden state (blank gap)
-                return `<div class="${baseClasses} text-transparent select-none bg-gray-50">${displayText}</div>`;
+                if (w.state === 'newline') return '<div class="h-4"></div>';
+                const indentClass = w.level === 2 ? 'ml-5 md:ml-10' : '';
+                const common = `mb-2 p-2 md:p-3 rounded-2xl transition-all duration-300 ${indentClass}`;
+                const processed = formatDisplayText(w.text);
+
+                if (w.state === 'yes') return `<div class="${common} bg-emerald-50 text-emerald-900 border border-emerald-100">${processed}</div>`;
+                if (w.state === 'no') return `<div class="${common} bg-rose-50 text-rose-800 border border-rose-100">${processed}</div>`;
+                if (w.state === 'revealed') return `<div id="current-revealed-word" class="${common} bg-blue-50 text-blue-900 border border-blue-200 shadow-md pulse-soft">${processed}</div>`;
+                return `<div class="${common} hidden-answer border border-slate-100">${processed}</div>`;
             }).join('');
 
             const revealedEl = document.getElementById('current-revealed-word');
-            if(revealedEl) {
-                revealedEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+            if (revealedEl) revealedEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
-        function advanceGame() {
-            currentSeqIndex++;
-            if (currentSeqIndex < activeSequence.length) {
-                currentWordIndex = activeSequence[currentSeqIndex];
-                gameWords[currentWordIndex].state = 'revealed';
-                renderGame();
-            } else {
-                startNewRound();
+        function formatDisplayText(text) {
+            if (!rememberHintsCheckbox.checked) {
+                return escapeHtml(text);
             }
+            return escapeHtml(text).replace(/#([^#]+)#/g, '<span class="always-visible font-semibold">$1</span>');
         }
 
-        newRoundBtn.addEventListener('click', startNewRound);
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
 
-        document.addEventListener('keydown', (e) => {
-            if (gameView.classList.contains('hidden')) return;
+        function updateStatsUI() {
+            const total = gameWords.filter(w => w.state !== 'newline').length;
+            const done = gameWords.filter(w => w.state === 'yes').length;
+            const remaining = getRemainingCount();
+            const answered = gameStats.yes + gameStats.no;
+            const accuracy = answered ? Math.round((gameStats.yes / answered) * 100) : 0;
 
-            if (e.key === 'Escape' || e.key === 'ArrowLeft') {
-                startNewRound();
-                return;
-            }
-            
-            if (currentWordIndex === -1 || gameWords[currentWordIndex].state !== 'revealed') {
-                e.preventDefault(); advanceGame(); return;
-            }
+            progressLabel.textContent = `${done} / ${total}`;
+            accuracyLabel.textContent = `${accuracy}%`;
+            remainingLabel.textContent = `${remaining}`;
+            mistakeLabel.textContent = `${gameStats.mistakes.size}`;
+            progressBar.style.width = total ? `${(done / total) * 100}%` : '0%';
+            updateModeLabel();
+        }
 
-            if (e.key === ' ' || e.key === 'ArrowRight') {
-                e.preventDefault(); noBtn.click();
-            } else if (e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                e.preventDefault(); yesBtn.click();
-            }
-        });
+        function getRemainingCount() {
+            return gameWords.filter(w => w.state !== 'newline' && w.state !== 'yes').length;
+        }
 
-        gameArea.addEventListener('click', (e) => {
-            if (currentWordIndex === -1 || gameWords[currentWordIndex].state !== 'revealed') {
-                advanceGame(); return;
-            }
-            if (currentWordIndex !== -1 && gameWords[currentWordIndex].state === 'revealed') {
-                gameWords[currentWordIndex].state = 'no';
-            }
-            advanceGame();
-        });
+        function renderCompletion(message) {
+            gameText.innerHTML = `
+                <div class="text-center py-16">
+                    <div class="text-5xl mb-4">🎉</div>
+                    <div class="text-2xl font-bold text-emerald-700">${message}</div>
+                    <p class="mt-3 muted">Accuracy: ${accuracyLabel.textContent} • Mistakes reviewed: ${gameStats.mistakes.size}</p>
+                </div>`;
+            updateStatsUI();
+        }
 
-        yesBtn.addEventListener('click', () => {
-            if (currentWordIndex !== -1 && gameWords[currentWordIndex].state === 'revealed') {
-                gameWords[currentWordIndex].state = 'yes';
-                renderGame();
-            } else {
-                advanceGame();
-            }
-        });
+        function updateTextStats() {
+            const text = textOutput.value;
+            const lines = text ? text.split(/\n/).filter(Boolean).length : 0;
+            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+            const chars = text.length;
+            const readingMin = Math.max(0, Math.ceil(words / 200));
+            statLines.textContent = `Lines: ${lines}`;
+            statWords.textContent = `Words: ${words}`;
+            statChars.textContent = `Chars: ${chars}`;
+            statReading.textContent = `Read: ${readingMin} min`;
+        }
 
-        noBtn.addEventListener('click', () => {
-            if (currentWordIndex !== -1 && gameWords[currentWordIndex].state === 'revealed') {
-                gameWords[currentWordIndex].state = 'no';
-                advanceGame();
-            } else {
-                advanceGame();
-            }
-        });
+        async function processFiles(files) {
+            if (!files?.length) return;
+            const names = files.map(f => f.name);
+            fileBadge.textContent = files.length === 1 ? names[0] : `${files.length} files selected`;
+            if (files.length > 1 && !textOutput.value.trim()) textOutput.value = '';
 
-        // --- File Extraction Logic ---
+            for (const file of files) {
+                await processFile(file);
+            }
+            updateTextStats();
+            persistText();
+            showToast(`${files.length} file(s) processed`);
+        }
+
         async function processFile(file) {
-            const ext = file.name.split('.').pop().toLowerCase();
-            textOutput.value = ''; 
+            const ext = (file.name.split('.').pop() || '').toLowerCase();
             showStatus(`Reading ${file.name}...`);
             try {
                 if (ext === 'txt') await extractFromTxt(file);
                 else if (ext === 'pdf') await extractFromPdf(file);
                 else if (ext === 'docx') await extractFromDocx(file);
-                else if (ext === 'doc') throw new Error("Legacy .doc files are not supported in-browser. Please convert to .docx or PDF.");
+                else if (ext === 'doc') throw new Error('Legacy .doc is not supported in-browser. Convert it to .docx or PDF.');
                 else if (['png', 'jpg', 'jpeg', 'bmp', 'webp'].includes(ext)) await extractFromImage(file);
                 else throw new Error(`Unsupported file type: .${ext}`);
             } catch (error) {
-                console.error(error); textOutput.value = `Error:\n${error.message}`;
+                console.error(error);
+                showToast(error.message || 'Failed to process file');
             } finally {
-                hideStatus(); fileInput.value = '';
+                hideStatus();
+                fileInput.value = '';
             }
         }
-        function showStatus(msg) { statusText.innerText = msg; statusContainer.classList.remove('hidden'); }
-        function hideStatus() { statusContainer.classList.add('hidden'); }
-        function appendText(txt) { if (textOutput.value.length > 0) textOutput.value += '\n\n'; textOutput.value += txt.trim(); }
-        function extractFromTxt(file) {
-            return new Promise((res, rej) => { const reader = new FileReader(); reader.onload = (e) => { appendText(e.target.result); res(); }; reader.onerror = rej; reader.readAsText(file); });
+
+        function appendText(txt) {
+            const clean = txt?.trim();
+            if (!clean) return;
+            textOutput.value = textOutput.value.trim() ? `${textOutput.value.trim()}\n\n${clean}` : clean;
         }
+
+        function extractFromTxt(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => { appendText(e.target.result); resolve(); };
+                reader.onerror = reject;
+                reader.readAsText(file);
+            });
+        }
+
         async function extractFromPdf(file) {
             const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
             let fullText = '';
             for (let i = 1; i <= pdf.numPages; i++) {
-                showStatus(`Extracting PDF (Page ${i}/${pdf.numPages})...`);
-                const content = await (await pdf.getPage(i)).getTextContent();
+                showStatus(`Extracting PDF page ${i}/${pdf.numPages}...`);
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
                 fullText += content.items.map(item => item.str).join(' ') + '\n';
             }
             appendText(fullText);
         }
+
         async function extractFromDocx(file) {
-            showStatus("Extracting Word Document...");
+            showStatus('Extracting Word document...');
             const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
-            appendText(result.value);
+            appendText(result.value || '');
         }
+
+        async function getOCRWorker() {
+            if (!tesseractWorker) {
+                tesseractWorker = await Tesseract.createWorker('eng+ben', 1, {
+                    logger: message => {
+                        if (message.status === 'recognizing text') {
+                            showStatus(`OCR: ${Math.round((message.progress || 0) * 100)}%`);
+                        }
+                    }
+                });
+            }
+            return tesseractWorker;
+        }
+
         async function extractFromImage(file) {
-            showStatus("Running OCR on image...");
-            const worker = await Tesseract.createWorker({ logger: m => { if (m.status === 'recognizing text') showStatus(`Recognizing Text: ${Math.round(m.progress * 100)}%`); } });
-            await worker.loadLanguage('eng+ben'); // Added Bengali language support just in case
-            await worker.initialize('eng+ben');
+            showStatus('Running OCR on image...');
+            const worker = await getOCRWorker();
             const { data: { text } } = await worker.recognize(file);
-            appendText(text);
-            await worker.terminate();
+            appendText(text || '');
         }
+
+        function showStatus(message) {
+            statusText.textContent = message;
+            statusContainer.classList.remove('hidden');
+        }
+
+        function hideStatus() {
+            statusContainer.classList.add('hidden');
+        }
+
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.remove('hidden');
+            toast.classList.add('toast-show');
+            clearTimeout(showToast._timer);
+            showToast._timer = setTimeout(() => toast.classList.add('hidden'), 1800);
+        }
+
+        function persistText() {
+            localStorage.setItem(STORAGE_KEYS.text, textOutput.value);
+        }
+
+        function loadSavedText() {
+            const savedText = localStorage.getItem(STORAGE_KEYS.text);
+            if (savedText) textOutput.value = savedText;
+        }
+
+        function savePreferences() {
+            const prefs = {
+                chunkMode: chunkModeSelect.value,
+                sequenceMode: sequenceModeSelect.value,
+                rememberHints: rememberHintsCheckbox.checked,
+                saveProgress: saveProgressCheckbox.checked,
+                repeatMistakes: repeatMistakesCheckbox.checked,
+                cleanBeforeStart: cleanBeforeStartCheckbox.checked
+            };
+            localStorage.setItem(STORAGE_KEYS.prefs, JSON.stringify(prefs));
+            updateModeLabel();
+        }
+
+        function loadPreferences() {
+            const prefs = JSON.parse(localStorage.getItem(STORAGE_KEYS.prefs) || '{}');
+            if (prefs.chunkMode) chunkModeSelect.value = prefs.chunkMode;
+            if (prefs.sequenceMode) sequenceModeSelect.value = prefs.sequenceMode;
+            if (typeof prefs.rememberHints === 'boolean') rememberHintsCheckbox.checked = prefs.rememberHints;
+            if (typeof prefs.saveProgress === 'boolean') saveProgressCheckbox.checked = prefs.saveProgress;
+            if (typeof prefs.repeatMistakes === 'boolean') repeatMistakesCheckbox.checked = prefs.repeatMistakes;
+            if (typeof prefs.cleanBeforeStart === 'boolean') cleanBeforeStartCheckbox.checked = prefs.cleanBeforeStart;
+            updateModeLabel();
+        }
+
+        function persistGameState() {
+            if (!saveProgressCheckbox.checked) return;
+            const state = {
+                gameWords,
+                activeSequence,
+                currentSeqIndex,
+                currentWordIndex,
+                stats: {
+                    total: gameStats.total,
+                    yes: gameStats.yes,
+                    no: gameStats.no,
+                    reveal: gameStats.reveal,
+                    mistakes: [...gameStats.mistakes],
+                    round: gameStats.round
+                },
+                prefs: {
+                    chunkMode: chunkModeSelect.value,
+                    sequenceMode: sequenceModeSelect.value
+                }
+            };
+            localStorage.setItem(STORAGE_KEYS.game, JSON.stringify(state));
+        }
+
+        function restoreSavedGame() {
+            const saved = JSON.parse(localStorage.getItem(STORAGE_KEYS.game) || 'null');
+            if (!saved?.gameWords?.length) return showToast('No saved game found');
+            gameWords = saved.gameWords;
+            activeSequence = saved.activeSequence || [];
+            currentSeqIndex = typeof saved.currentSeqIndex === 'number' ? saved.currentSeqIndex : -1;
+            currentWordIndex = typeof saved.currentWordIndex === 'number' ? saved.currentWordIndex : -1;
+            chunkModeSelect.value = saved.prefs?.chunkMode || chunkModeSelect.value;
+            sequenceModeSelect.value = saved.prefs?.sequenceMode || sequenceModeSelect.value;
+            resetStats();
+            gameStats.total = saved.stats?.total || gameWords.filter(w => w.state !== 'newline').length;
+            gameStats.yes = saved.stats?.yes || 0;
+            gameStats.no = saved.stats?.no || 0;
+            gameStats.reveal = saved.stats?.reveal || 0;
+            gameStats.mistakes = new Set(saved.stats?.mistakes || []);
+            gameStats.round = saved.stats?.round || 1;
+            openGameView();
+            renderGame();
+            updateStatsUI();
+            showToast('Saved game restored');
+        }
+
+        function applySavedTheme() {
+            const theme = localStorage.getItem(STORAGE_KEYS.theme) || 'light';
+            document.body.classList.toggle('dark', theme === 'dark');
+            themeToggleBtn.textContent = theme === 'dark' ? '☀️ Light mode' : '🌙 Dark mode';
+        }
+
+        function toggleTheme() {
+            const isDark = document.body.classList.toggle('dark');
+            localStorage.setItem(STORAGE_KEYS.theme, isDark ? 'dark' : 'light');
+            themeToggleBtn.textContent = isDark ? '☀️ Light mode' : '🌙 Dark mode';
+        }
+
+        window.addEventListener('beforeunload', async () => {
+            persistGameState();
+            if (tesseractWorker) {
+                try { await tesseractWorker.terminate(); } catch {}
+            }
+        });
     </script>
 </body>
 </html>
