@@ -3,13 +3,19 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Universal Text Extractor & Memory Trainer</title>
+    <title>Text Trainer</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
-        .drag-over { border-color: #2563eb !important; background-color: #eff6ff !important; }
+        .drag-over { border-color: #3b82f6 !important; background-color: #eff6ff !important; }
+        .dark .drag-over { border-color: #60a5fa !important; background-color: rgba(59, 130, 246, 0.1) !important; }
         .loader {
             border: 3px solid #e5e7eb;
             border-top: 3px solid #2563eb;
@@ -19,79 +25,79 @@
             animation: spin 1s linear infinite;
             display: inline-block;
         }
-        .glass { backdrop-filter: blur(12px); }
+        .dark .loader { border-color: #334155; border-top-color: #3b82f6; }
         .hidden-answer { color: transparent; background: linear-gradient(90deg, rgba(209,213,219,.28), rgba(229,231,235,.65), rgba(209,213,219,.28)); border-radius: 10px; }
         .hidden-answer .always-visible { color: #374151 !important; }
-        .dark .hidden-answer .always-visible { color: #e5e7eb !important; }
+        
+        .dark .hidden-answer { background: linear-gradient(90deg, rgba(30,41,59,.6), rgba(51,65,85,.8), rgba(30,41,59,.6)); }
+        .dark .hidden-answer .always-visible { color: #cbd5e1 !important; }
+        
         .toast-show { animation: toast-in .25s ease-out forwards; }
         .pulse-soft { animation: pulse-soft 1.3s ease-in-out infinite; }
         .prompt-card { background: linear-gradient(135deg, rgba(251,191,36,.12), rgba(245,158,11,.18)); border: 1px solid rgba(245,158,11,.32); }
+        .dark .prompt-card { background: linear-gradient(135deg, rgba(245,158,11,.1), rgba(217,119,6,.15)); border: 1px solid rgba(245,158,11,.2); }
         .tap-hint { box-shadow: inset 0 0 0 1px rgba(59,130,246,.12); }
+        .dark .tap-hint { box-shadow: inset 0 0 0 1px rgba(96,165,250,.2); }
+        
         @keyframes spin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
         @keyframes toast-in { from { opacity: 0; transform: translateY(12px);} to { opacity: 1; transform: translateY(0);} }
         @keyframes pulse-soft { 0%,100% { transform: scale(1);} 50% { transform: scale(1.02);} }
-        body.dark { background: #0f172a; color: #e5e7eb; }
-        body.dark textarea, body.dark .panel, body.dark .card, body.dark .game-shell { background: #111827 !important; color: #e5e7eb !important; border-color: #334155 !important; }
-        body.dark .muted { color: #94a3b8 !important; }
-        body.dark .surface { background: #1e293b !important; }
-        body.dark #game-view { background: #020617; }
-        body.dark .topbar { background: linear-gradient(90deg,#1d4ed8,#4338ca); }
-        body.dark .hidden-answer { background: linear-gradient(90deg, rgba(51,65,85,.45), rgba(71,85,105,.65), rgba(51,65,85,.45)); }
+        
+        input[type="checkbox"] { accent-color: #2563eb; }
+        .dark input[type="checkbox"] { accent-color: #3b82f6; }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen font-sans text-slate-800 p-4 md:p-8 transition-colors">
-    <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 text-white px-4 py-2 rounded-full shadow-xl text-sm toast-show"></div>
+<body class="bg-slate-50 dark:bg-[#0b1120] min-h-screen font-sans text-slate-800 dark:text-slate-200 p-4 md:p-8 transition-colors duration-300">
+    <div id="toast" class="hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 dark:bg-white dark:text-slate-900 text-white px-4 py-2 rounded-full shadow-xl text-sm toast-show"></div>
 
-    <div id="main-view" class="max-w-6xl mx-auto card bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
-        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 md:p-8 text-white">
+    <div id="main-view" class="max-w-6xl mx-auto card bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 transition-colors">
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-900 dark:to-indigo-900 p-6 md:p-8 text-white">
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 class="text-2xl md:text-3xl font-bold">Universal Text Extractor & Memory Trainer</h1>
-                    <p class="text-blue-100 mt-2 text-sm md:text-base">PDF, image, DOCX, TXT, or pasted text → clean it → turn it into a smarter memorization game.</p>
+                    <h1 class="text-2xl md:text-3xl font-bold">Text Trainer</h1>
                 </div>
-                <button id="theme-toggle-btn" class="self-start md:self-auto bg-white/15 hover:bg-white/25 border border-white/20 px-4 py-2 rounded-xl text-sm font-semibold transition">🌙 Dark mode</button>
+                <button id="theme-toggle-btn" class="self-start md:self-auto bg-white/15 hover:bg-white/25 border border-white/20 px-4 py-2 rounded-xl text-sm font-semibold transition">🌙</button>
             </div>
         </div>
 
-        <div class="p-5 md:p-6 grid grid-cols-1 xl:grid-cols-[1.05fr_1.35fr] gap-6">
-            <div class="space-y-5">
-                <div class="panel bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <div class="p-4 md:p-5 grid grid-cols-1 xl:grid-cols-[1.05fr_1.35fr] gap-4">
+            <div class="space-y-4">
+                <div class="panel bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl p-5 shadow-sm">
                     <div class="flex items-center justify-between gap-3 mb-3">
                         <h2 class="text-lg font-semibold">Input</h2>
-                        <span id="file-badge" class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full muted">No file loaded</span>
+                        <span id="file-badge" class="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-full">No file</span>
                     </div>
 
-                    <div id="drop-zone" class="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center transition cursor-pointer hover:bg-slate-50">
-                        <div class="text-5xl mb-3">📄</div>
-                        <p class="font-semibold">Drag & drop a file here</p>
-                        <p class="text-sm muted mt-1">or tap to select</p>
-                        <p class="text-xs muted mt-2">Supported: PDF, DOCX, TXT, PNG, JPG, JPEG, WEBP, BMP</p>
+                    <div id="drop-zone" class="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-8 text-center transition cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <div class="text-4xl mb-2">📄</div>
+                        <p class="font-semibold">Drop file</p>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Tap to select</p>
                         <input type="file" id="file-input" class="hidden" accept=".pdf,.docx,.doc,.txt,image/*" multiple>
                     </div>
 
-                    <div id="status-container" class="hidden mt-4 bg-blue-50 text-blue-700 border border-blue-100 p-3 rounded-2xl flex items-center gap-3 text-sm font-medium">
+                    <div id="status-container" class="hidden mt-4 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-500/20 p-3 rounded-2xl flex items-center gap-3 text-sm font-medium">
                         <div class="loader"></div>
                         <span id="status-text">Processing...</span>
                     </div>
                 </div>
 
-                <div class="panel bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                <div class="panel bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl p-4 shadow-sm space-y-3">
                     <div class="flex items-center justify-between gap-4 flex-wrap">
-                        <h2 class="text-lg font-semibold">Game Setup</h2>
-                        <button id="restore-btn" class="text-sm bg-amber-100 hover:bg-amber-200 text-amber-800 px-3 py-2 rounded-xl transition">Restore Saved Game</button>
+                        <h2 class="text-lg font-semibold">Setup</h2>
+                        <button id="restore-btn" class="text-sm bg-amber-100 dark:bg-amber-500/20 hover:bg-amber-200 dark:hover:bg-amber-500/30 text-amber-800 dark:text-amber-300 px-3 py-2 rounded-xl transition">Restore</button>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <label class="space-y-2">
-                            <span class="text-sm font-medium">Chunk mode</span>
-                            <select id="chunk-mode-select" class="w-full rounded-xl border border-slate-300 px-3 py-2 bg-white surface">
+                            <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Chunk</span>
+                            <select id="chunk-mode-select" class="w-full rounded-xl border border-slate-300 dark:border-slate-600 px-3 py-2 bg-white dark:bg-slate-900 focus:outline-none focus:border-blue-500">
                                 <option value="line">Line</option>
                                 <option value="sentence">Sentence</option>
                             </select>
                         </label>
                         <label class="space-y-2">
-                            <span class="text-sm font-medium">Sequence mode</span>
-                            <select id="sequence-mode-select" class="w-full rounded-xl border border-slate-300 px-3 py-2 bg-white surface">
+                            <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Order</span>
+                            <select id="sequence-mode-select" class="w-full rounded-xl border border-slate-300 dark:border-slate-600 px-3 py-2 bg-white dark:bg-slate-900 focus:outline-none focus:border-blue-500">
                                 <option value="linear">Linear</option>
                                 <option value="category">Category</option>
                                 <option value="shuffle">Shuffle</option>
@@ -100,97 +106,95 @@
                     </div>
 
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                        <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 cursor-pointer surface">
+                        <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
                             <input id="remember-hints-checkbox" type="checkbox" checked>
-                            <span>Show #hint#</span>
+                            <span>Hints</span>
                         </label>
-                        <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 cursor-pointer surface">
+                        <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
                             <input id="save-progress-checkbox" type="checkbox" checked>
-                            <span>Auto save</span>
+                            <span>Save</span>
                         </label>
-                        <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 cursor-pointer surface">
+                        <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
                             <input id="repeat-mistakes-checkbox" type="checkbox" checked>
-                            <span>Repeat mistakes</span>
+                            <span>Repeat</span>
                         </label>
-                        <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 cursor-pointer surface">
+                        <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
                             <input id="clean-before-start-checkbox" type="checkbox" checked>
-                            <span>Auto clean</span>
+                            <span>Clean</span>
                         </label>
                     </div>
 
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <button id="clean-text-btn" class="bg-slate-100 hover:bg-slate-200 px-4 py-3 rounded-xl font-semibold transition">Clean Text</button>
-                        <button id="copy-btn" class="bg-slate-100 hover:bg-slate-200 px-4 py-3 rounded-xl font-semibold transition">Copy</button>
-                        <button id="download-btn" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-4 py-3 rounded-xl font-semibold transition">Download TXT</button>
-                        <button id="start-game-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl font-semibold shadow-lg transition">Start Game</button>
+                        <button id="clean-text-btn" class="bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600 px-4 py-3 rounded-xl font-semibold transition">Clean</button>
+                        <button id="copy-btn" class="bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600 px-4 py-3 rounded-xl font-semibold transition">Copy</button>
+                        <button id="download-btn" class="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-500/30 px-4 py-3 rounded-xl font-semibold transition">Download</button>
+                        <button id="start-game-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl font-semibold shadow-lg transition">Start</button>
                     </div>
                 </div>
             </div>
 
-            <div class="panel bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col gap-4">
+            <div class="panel bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h2 class="text-lg font-semibold">Text Workspace</h2>
-                        <p class="text-sm muted">Paste text directly or extract from files, then clean and practice.</p>
+                        <h2 class="text-lg font-semibold">Text</h2>
                     </div>
                     <div class="flex flex-wrap gap-2 text-xs">
-                        <span id="stat-lines" class="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full">Lines: 0</span>
-                        <span id="stat-words" class="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full">Words: 0</span>
-                        <span id="stat-chars" class="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full">Chars: 0</span>
-                        <span id="stat-reading" class="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full">Read: 0 min</span>
+                        <span id="stat-lines" class="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-full">L 0</span>
+                        <span id="stat-words" class="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-full">W 0</span>
+                        <span id="stat-chars" class="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-full">C 0</span>
+                        <span id="stat-reading" class="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-full">R 0m</span>
                     </div>
                 </div>
-                <textarea id="text-output" class="w-full min-h-[420px] md:min-h-[520px] p-4 border border-slate-300 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y text-sm leading-6 panel" placeholder="Extracted text will appear here. You can also paste text directly..."></textarea>
+                <textarea id="text-output" class="w-full min-h-[420px] md:min-h-[520px] p-4 bg-white dark:bg-[#0f172a] border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y text-sm leading-6" placeholder="Paste or extract text..."></textarea>
             </div>
         </div>
     </div>
 
-    <div id="game-view" class="hidden fixed inset-0 z-50 flex flex-col">
-        <div class="topbar bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg">
-            <div class="max-w-6xl mx-auto px-3 md:px-5 py-3 space-y-3">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                        <h1 class="text-lg md:text-xl font-bold">Memorization Game</h1>
-                        <p id="game-subtitle" class="text-blue-100 text-xs md:text-sm">Tap anywhere to move on. Tap the active card to reveal the full answer.</p>
+    <div id="game-view" class="hidden fixed inset-0 z-50 flex flex-col bg-slate-50 dark:bg-[#0b1120]">
+        
+        <div class="flex-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800/80 sticky top-0 z-10">
+            <div class="w-full h-1 bg-slate-100 dark:bg-slate-800">
+                <div id="progress-bar" class="h-full bg-blue-500 transition-all duration-300" style="width:0%"></div>
+            </div>
+            
+            <div class="max-w-5xl mx-auto px-3 md:px-5 py-2 flex items-center justify-between gap-2 text-[11px] md:text-xs font-semibold text-slate-500 dark:text-slate-400">
+                <div class="flex items-center gap-3 md:gap-5 flex-wrap">
+                    <span id="mode-label" class="hidden sm:inline font-bold text-slate-400 dark:text-slate-500"></span>
+                    
+                    <div class="flex gap-1.5 items-center text-slate-700 dark:text-slate-300" title="Done / Total">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                        <span id="progress-label">0 / 0</span>
                     </div>
-                    <div class="flex gap-2 shrink-0">
-                        <button id="review-mistakes-btn" class="bg-amber-400/90 hover:bg-amber-400 text-amber-950 px-3 py-2 rounded-xl text-xs md:text-sm font-semibold transition">Mistakes</button>
-                        <button id="exit-game-btn" class="bg-slate-900/35 hover:bg-slate-900/55 px-3 py-2 rounded-xl text-xs md:text-sm font-semibold transition">Exit</button>
+                    
+                    <div class="flex gap-1.5 items-center text-emerald-600 dark:text-emerald-400" title="Accuracy">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                        <span id="accuracy-label">0%</span>
+                    </div>
+                    
+                    <div class="flex gap-1.5 items-center text-blue-600 dark:text-blue-400" title="Remaining">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span id="remaining-label">0</span>
+                    </div>
+                    
+                    <div class="flex gap-1.5 items-center text-rose-600 dark:text-rose-400" title="Mistakes">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        <span id="mistake-label">0</span>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-4 gap-2 text-xs md:text-sm">
-                    <div class="bg-white/12 rounded-2xl px-3 py-2.5 glass">
-                        <div class="text-blue-100 uppercase tracking-wide text-[10px] md:text-xs">Done</div>
-                        <div id="progress-label" class="font-bold text-sm md:text-base">0 / 0</div>
-                    </div>
-                    <div class="bg-white/12 rounded-2xl px-3 py-2.5 glass">
-                        <div class="text-blue-100 uppercase tracking-wide text-[10px] md:text-xs">Acc</div>
-                        <div id="accuracy-label" class="font-bold text-sm md:text-base">0%</div>
-                    </div>
-                    <div class="bg-white/12 rounded-2xl px-3 py-2.5 glass">
-                        <div class="text-blue-100 uppercase tracking-wide text-[10px] md:text-xs">Left</div>
-                        <div id="remaining-label" class="font-bold text-sm md:text-base">0</div>
-                    </div>
-                    <div class="bg-white/12 rounded-2xl px-3 py-2.5 glass">
-                        <div class="text-blue-100 uppercase tracking-wide text-[10px] md:text-xs">Mistakes</div>
-                        <div id="mistake-label" class="font-bold text-sm md:text-base">0</div>
-                    </div>
-                </div>
-
-                <div class="w-full h-2 bg-white/20 rounded-full overflow-hidden">
-                    <div id="progress-bar" class="h-full bg-emerald-300 rounded-full transition-all duration-300" style="width:0%"></div>
-                </div>
-
-                <div class="flex items-center justify-between gap-3 text-[11px] md:text-xs text-blue-50/95">
-                    <div id="mode-label" class="font-semibold truncate">Linear / Line</div>
-                    <div class="text-right">Tap active card = reveal / forgot<br>Tap elsewhere = next / remembered</div>
+                <div class="flex items-center gap-3 shrink-0 ml-auto">
+                    <button id="restart-round-btn" class="p-1 text-slate-400 dark:text-slate-500 hover:text-amber-500 dark:hover:text-amber-400 transition" title="Restart Round">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    </button>
+                    <button id="exit-game-btn" class="p-1 text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 transition" title="Exit Game">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
                 </div>
             </div>
         </div>
 
-        <div id="game-area" class="flex-1 overflow-y-auto px-3 md:px-5 py-3 md:py-5 bg-slate-50 dark:bg-slate-950">
-            <div class="game-shell max-w-5xl mx-auto bg-white border border-slate-200 rounded-3xl shadow-xl p-3 md:p-5">
+        <div id="game-area" class="flex-1 overflow-y-auto px-3 md:px-5 py-4 md:py-8">
+            <div class="game-shell max-w-5xl mx-auto bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-3xl shadow-xl dark:shadow-2xl dark:shadow-black/50 p-3 md:p-6">
                 <div id="game-text" class="text-sm md:text-base leading-8 select-none"></div>
             </div>
         </div>
@@ -234,8 +238,7 @@
         const startGameBtn = document.getElementById('start-game-btn');
         const gameView = document.getElementById('game-view');
         const exitGameBtn = document.getElementById('exit-game-btn');
-        const newRoundBtn = document.getElementById('new-round-btn');
-        const reviewMistakesBtn = document.getElementById('review-mistakes-btn');
+        const restartRoundBtn = document.getElementById('restart-round-btn');
         const gameArea = document.getElementById('game-area');
         const gameText = document.getElementById('game-text');
         const progressLabel = document.getElementById('progress-label');
@@ -244,13 +247,13 @@
         const mistakeLabel = document.getElementById('mistake-label');
         const modeLabel = document.getElementById('mode-label');
         const progressBar = document.getElementById('progress-bar');
-        const gameSubtitle = document.getElementById('game-subtitle');
         const toast = document.getElementById('toast');
 
         let gameWords = [];
         let activeSequence = [];
         let currentSeqIndex = -1;
         let currentWordIndex = -1;
+        let pendingAnswerIndex = -1;
         let tesseractWorker = null;
 
         const gameStats = {
@@ -330,7 +333,11 @@
             startGameBtn.addEventListener('click', startGameFromText);
             restoreBtn.addEventListener('click', restoreSavedGame);
             exitGameBtn.addEventListener('click', exitGame);
-            reviewMistakesBtn.addEventListener('click', startMistakeReview);
+            
+            restartRoundBtn.addEventListener('click', () => {
+                startNewRound();
+                showToast('Round restarted');
+            });
 
             gameArea.addEventListener('click', handleGameTap);
 
@@ -338,44 +345,36 @@
                 if (gameView.classList.contains('hidden')) return;
                 if (e.key === 'Escape') return exitGame();
                 if (e.key === 'n' || e.key === 'N') return startNewRound();
-                if (e.key === 'm' || e.key === 'M') return startMistakeReview();
-                if (e.key === 'r' || e.key === 'R') return revealCurrent();
+                if (e.key === 'm' || e.key === 'M') { 
+                    startNewRound();
+                    showToast('Round restarted');
+                    return; 
+                }
+                if (e.key === 'r' || e.key === 'R') return handleAdvanceTap();
                 if (e.key === ' ' || e.code === 'Space' || e.key === 'Enter' || e.key === 'ArrowRight') {
                     e.preventDefault();
                     return handleAdvanceTap();
                 }
                 if (e.key === 'ArrowDown') {
                     e.preventDefault();
-                    return revealCurrent();
+                    return handleAdvanceTap();
                 }
             });
         }
 
-
         function handleGameTap(e) {
             if (e.target.closest('button')) return;
-            const activeCard = e.target.closest('#current-revealed-word');
-            if (activeCard) {
-                if (gameWords[currentWordIndex]?.state === 'prompt') return revealCurrent();
-                if (gameWords[currentWordIndex]?.state === 'revealed') return handleAdvanceTap(true);
-            }
-            handleAdvanceTap(false);
+            const tappedPending = e.target.closest('#pending-answer-word');
+            if (tappedPending) return markPendingNo();
+            handleAdvanceTap();
         }
 
-        function handleAdvanceTap(fromRevealedCard = false) {
-            if (currentWordIndex === -1) return advanceGame();
-            const current = gameWords[currentWordIndex];
-            if (!current) return advanceGame();
-
-            if (current.state === 'prompt') {
-                return markYes();
+        function handleAdvanceTap() {
+            if (pendingAnswerIndex !== -1) {
+                markPendingYes();
             }
-
-            if (current.state === 'revealed') {
-                return markNo();
-            }
-
-            return advanceGame();
+            if (currentWordIndex === -1) return;
+            revealAndQueueNext();
         }
 
         function cleanText(text) {
@@ -499,113 +498,98 @@
             });
 
             if (remaining === 0) {
-                renderCompletion('All chunks memorized 🎉');
+                renderCompletion('Done 🎉');
                 persistGameState();
                 return;
             }
 
+            gameStats.mistakes.clear();
+            
             activeSequence = generateSequence();
             currentSeqIndex = -1;
             currentWordIndex = -1;
-            gameSubtitle.textContent = `Round ${gameStats.round} • Tap anywhere to go next. Tap the active card if you need the answer.`;
+            pendingAnswerIndex = -1;
+            queueNextCurrent();
             renderGame();
             updateStatsUI();
+            persistGameState();
             gameStats.round += 1;
         }
 
-        function startMistakeReview() {
-            const mistakeIndices = [...gameStats.mistakes].filter(i => gameWords[i] && gameWords[i].state !== 'newline');
-            if (!mistakeIndices.length) return showToast('No mistakes to review yet');
-
-            gameWords.forEach((w, i) => {
-                if (w.state !== 'newline') {
-                    w.state = mistakeIndices.includes(i) ? 'hidden' : 'yes';
-                }
-            });
-            activeSequence = shuffle(mistakeIndices);
-            currentSeqIndex = -1;
-            currentWordIndex = -1;
-            gameSubtitle.textContent = `Mistake review • Tap active card to reveal, tap elsewhere to continue • ${mistakeIndices.length} item(s)`;
-            renderGame();
-            updateStatsUI();
-            showToast('Mistake review started');
-        }
-
         function revealCurrent() {
-            if (currentWordIndex === -1) {
-                advanceGame();
-                return;
-            }
-            const current = gameWords[currentWordIndex];
-            if (!current) return advanceGame();
-            if (current.state === 'prompt') {
-                current.state = 'revealed';
-                gameStats.reveal += 1;
-                gameStats.no += 1;
-                gameStats.mistakes.add(currentWordIndex);
-                renderGame();
-                updateStatsUI();
-                persistGameState();
-                return;
-            }
-            if (current.state === 'revealed') {
-                showToast('Tap anywhere else to continue');
-                return;
-            }
-            advanceGame();
+            handleAdvanceTap();
         }
 
-        function advanceGame() {
-            if (!activeSequence.length) {
-                if (repeatMistakesCheckbox.checked && gameStats.mistakes.size) return startMistakeReview();
-                return startNewRound();
-            }
-
-            currentSeqIndex += 1;
-            if (currentSeqIndex >= activeSequence.length) {
-                if (repeatMistakesCheckbox.checked && getRemainingCount() === 0 && gameStats.mistakes.size) {
-                    return startMistakeReview();
+        function queueNextCurrent() {
+            while (true) {
+                currentSeqIndex += 1;
+                if (currentSeqIndex >= activeSequence.length) {
+                    currentWordIndex = -1;
+                    if (pendingAnswerIndex === -1) {
+                        if (repeatMistakesCheckbox.checked || getRemainingCount() === 0) {
+                            startNewRound();
+                        } else {
+                            renderCompletion('Round Complete');
+                            persistGameState();
+                        }
+                        return false;
+                    }
+                    return false;
                 }
-                return startNewRound();
-            }
 
-            currentWordIndex = activeSequence[currentSeqIndex];
-            if (!gameWords[currentWordIndex]) return advanceGame();
-            gameWords[currentWordIndex].state = 'prompt';
+                currentWordIndex = activeSequence[currentSeqIndex];
+                const current = gameWords[currentWordIndex];
+                if (!current || current.state === 'newline' || current.state === 'yes' || current.state === 'no') {
+                    continue;
+                }
+                current.state = 'prompt';
+                return true;
+            }
+        }
+
+        function revealAndQueueNext() {
+            const current = gameWords[currentWordIndex];
+            if (!current) return;
+            if (current.state !== 'prompt') return;
+
+            current.state = 'revealed';
+            pendingAnswerIndex = currentWordIndex;
+            queueNextCurrent();
             renderGame();
             updateStatsUI();
             persistGameState();
         }
 
-        function markYes() {
-            if (currentWordIndex === -1) return advanceGame();
-            const current = gameWords[currentWordIndex];
-            if (!current) return advanceGame();
-            if (current.state === 'revealed') return markNo();
-            if (current.state !== 'prompt') return advanceGame();
-
-            current.state = 'yes';
+        function markPendingYes() {
+            if (pendingAnswerIndex === -1) return;
+            const pending = gameWords[pendingAnswerIndex];
+            if (!pending || pending.state !== 'revealed') {
+                pendingAnswerIndex = -1;
+                return;
+            }
+            pending.state = 'yes';
             gameStats.yes += 1;
+            pendingAnswerIndex = -1;
             renderGame();
             updateStatsUI();
             persistGameState();
-            advanceGame();
         }
 
-        function markNo() {
-            if (currentWordIndex === -1) return advanceGame();
-            const current = gameWords[currentWordIndex];
-            if (!current) return advanceGame();
-            if (current.state === 'prompt') {
-                return revealCurrent();
+        function markPendingNo() {
+            if (pendingAnswerIndex === -1) return;
+            const pending = gameWords[pendingAnswerIndex];
+            if (!pending || pending.state !== 'revealed') {
+                pendingAnswerIndex = -1;
+                return;
             }
-            if (current.state !== 'revealed') return advanceGame();
-
-            current.state = 'no';
+            pending.state = 'no';
+            gameStats.no += 1;
+            gameStats.reveal += 1;
+            gameStats.mistakes.add(pendingAnswerIndex);
+            pendingAnswerIndex = -1;
             renderGame();
             updateStatsUI();
             persistGameState();
-            advanceGame();
         }
 
         function renderGame() {
@@ -615,15 +599,15 @@
                 const common = `mb-2 p-2 md:p-3 rounded-2xl transition-all duration-300 ${indentClass}`;
                 const processed = formatDisplayText(w.text);
 
-                if (w.state === 'yes') return `<div class="${common} bg-emerald-50 text-emerald-900 border border-emerald-100">${processed}</div>`;
-                if (w.state === 'no') return `<div class="${common} bg-rose-50 text-rose-800 border border-rose-100">${processed}</div>`;
-                if (w.state === 'revealed') return `<div id="current-revealed-word" class="${common} tap-hint bg-blue-50 text-blue-900 border border-blue-200 shadow-md pulse-soft"><div class="text-[11px] uppercase tracking-wide font-semibold text-blue-500 mb-1">Revealed · tap anywhere else for next</div>${processed}</div>`;
-                if (w.state === 'prompt') return `<div id="current-revealed-word" class="${common} prompt-card tap-hint shadow-md pulse-soft"><div class="text-[11px] uppercase tracking-wide font-semibold text-amber-700 mb-1">Active · tap this card to reveal / forgot</div><div class="hidden-answer border border-transparent">${processed}</div></div>`;
-                return `<div class="${common} hidden-answer border border-slate-100">${processed}</div>`;
+                if (w.state === 'yes') return `<div class="${common} bg-emerald-50 dark:bg-emerald-500/10 text-emerald-900 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-500/20">${processed}</div>`;
+                if (w.state === 'no') return `<div class="${common} bg-rose-50 dark:bg-rose-500/10 text-rose-800 dark:text-rose-300 border border-rose-100 dark:border-rose-500/20">${processed}</div>`;
+                if (w.state === 'revealed') return `<div id="pending-answer-word" class="${common} tap-hint bg-blue-50 dark:bg-blue-500/10 text-blue-900 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30 shadow-md pulse-soft">${processed}</div>`;
+                if (w.state === 'prompt') return `<div id="current-prompt-word" class="${common} prompt-card dark:border-amber-500/30 dark:bg-amber-500/10 tap-hint shadow-md pulse-soft"><div class="hidden-answer border border-transparent">${processed}</div></div>`;
+                return `<div class="${common} hidden-answer border border-slate-100 dark:border-slate-700/50">${processed}</div>`;
             }).join('');
 
-            const revealedEl = document.getElementById('current-revealed-word');
-            if (revealedEl) revealedEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const focusEl = document.getElementById('current-prompt-word') || document.getElementById('pending-answer-word');
+            if (focusEl) focusEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
         function formatDisplayText(text) {
@@ -665,9 +649,8 @@
             gameText.innerHTML = `
                 <div class="text-center py-16">
                     <div class="text-5xl mb-4">🎉</div>
-                    <div class="text-2xl font-bold text-emerald-700">${message}</div>
-                    <p class="mt-3 muted">Accuracy: ${accuracyLabel.textContent} • Mistakes reviewed: ${gameStats.mistakes.size}</p>
-                    <p class="mt-2 text-sm muted">Tap Exit to return to the workspace.</p>
+                    <div class="text-2xl font-bold text-emerald-700 dark:text-emerald-400">${message}</div>
+                    <p class="mt-3 text-slate-500 dark:text-slate-400">Accuracy: ${accuracyLabel.textContent} • Mistakes: ${gameStats.mistakes.size}</p>
                 </div>`;
             updateStatsUI();
         }
@@ -678,10 +661,10 @@
             const words = text.trim() ? text.trim().split(/\s+/).length : 0;
             const chars = text.length;
             const readingMin = Math.max(0, Math.ceil(words / 200));
-            statLines.textContent = `Lines: ${lines}`;
-            statWords.textContent = `Words: ${words}`;
-            statChars.textContent = `Chars: ${chars}`;
-            statReading.textContent = `Read: ${readingMin} min`;
+            statLines.textContent = `L ${lines}`;
+            statWords.textContent = `W ${words}`;
+            statChars.textContent = `C ${chars}`;
+            statReading.textContent = `R ${readingMin}m`;
         }
 
         async function processFiles(files) {
@@ -827,6 +810,7 @@
                 activeSequence,
                 currentSeqIndex,
                 currentWordIndex,
+                pendingAnswerIndex,
                 stats: {
                     total: gameStats.total,
                     yes: gameStats.yes,
@@ -850,6 +834,7 @@
             activeSequence = saved.activeSequence || [];
             currentSeqIndex = typeof saved.currentSeqIndex === 'number' ? saved.currentSeqIndex : -1;
             currentWordIndex = typeof saved.currentWordIndex === 'number' ? saved.currentWordIndex : -1;
+            pendingAnswerIndex = typeof saved.pendingAnswerIndex === 'number' ? saved.pendingAnswerIndex : -1;
             chunkModeSelect.value = saved.prefs?.chunkMode || chunkModeSelect.value;
             sequenceModeSelect.value = saved.prefs?.sequenceMode || sequenceModeSelect.value;
             resetStats();
@@ -867,14 +852,16 @@
 
         function applySavedTheme() {
             const theme = localStorage.getItem(STORAGE_KEYS.theme) || 'light';
+            document.documentElement.classList.toggle('dark', theme === 'dark');
             document.body.classList.toggle('dark', theme === 'dark');
-            themeToggleBtn.textContent = theme === 'dark' ? '☀️ Light mode' : '🌙 Dark mode';
+            themeToggleBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
         }
 
         function toggleTheme() {
-            const isDark = document.body.classList.toggle('dark');
+            const isDark = document.documentElement.classList.toggle('dark');
+            document.body.classList.toggle('dark', isDark);
             localStorage.setItem(STORAGE_KEYS.theme, isDark ? 'dark' : 'light');
-            themeToggleBtn.textContent = isDark ? '☀️ Light mode' : '🌙 Dark mode';
+            themeToggleBtn.textContent = isDark ? '☀️' : '🌙';
         }
 
         window.addEventListener('beforeunload', async () => {
